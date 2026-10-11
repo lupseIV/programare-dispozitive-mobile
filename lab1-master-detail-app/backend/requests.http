@@ -1,0 +1,20 @@
+### List books (supports ?q=, ?genre=, ?read=true, ?page=, ?size=)
+GET http://localhost:3000/api/books
+
+### One book
+GET http://localhost:3000/api/books/1
+
+### Create
+POST http://localhost:3000/api/books
+Content-Type: application/json
+
+{ "title": "Neuromancer", "author": "William Gibson", "genre": "Sci-Fi", "year": 1984, "pages": 271 }
+
+### Update (send the version you have; a stale version returns 409)
+PUT http://localhost:3000/api/books/1
+Content-Type: application/json
+
+{ "title": "Dune", "author": "Frank Herbert", "genre": "Sci-Fi", "year": 1965, "pages": 412, "read": true, "rating": 5, "version": 1 }
+
+### Delete
+DELETE http://localhost:3000/api/books/2

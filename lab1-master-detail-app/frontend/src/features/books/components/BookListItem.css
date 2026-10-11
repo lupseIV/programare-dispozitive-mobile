@@ -1,0 +1,7 @@
+.book-list-item h2 {
+    font-weight: 600;
+}
+
+.book-list-item__genre {
+    font-size: 0.75rem;
+}

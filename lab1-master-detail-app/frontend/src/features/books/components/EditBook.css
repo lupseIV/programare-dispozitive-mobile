@@ -1,0 +1,16 @@
+.edit-book__loading {
+    display: flex;
+    justify-content: center;
+    padding: 32px;
+}
+
+.edit-book__warning {
+    margin: 0 16px 8px;
+    font-weight: 600;
+}
+
+.edit-book__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
