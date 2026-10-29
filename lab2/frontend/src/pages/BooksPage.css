@@ -1,0 +1,10 @@
+.books-page__error {
+    padding: 16px;
+    color: var(--ion-color-danger);
+}
+
+.books-page__empty {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--ion-color-medium);
+}

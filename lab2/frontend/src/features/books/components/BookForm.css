@@ -1,0 +1,9 @@
+.book-form__error {
+    margin: 0 16px 8px;
+    font-size: 0.9rem;
+}
+
+.book-form__rating-label {
+    flex: 0 0 auto;
+    min-width: 80px;
+}
