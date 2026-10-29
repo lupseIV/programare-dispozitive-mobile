@@ -1,6 +1,6 @@
 import React from 'react';
 import { IonIcon, IonItem, IonLabel, IonNote } from '@ionic/react';
-import { checkmarkCircle, ellipseOutline } from 'ionicons/icons';
+import { checkmarkCircle, cloudOfflineOutline, ellipseOutline } from 'ionicons/icons';
 import { Book } from '../book.types';
 import './BookListItem.css';
 
@@ -19,6 +19,9 @@ const BookListItem: React.FC<Props> = ({ book }) => (
             <h2>{book.title}</h2>
             <p>{book.author} · {book.year}</p>
         </IonLabel>
+        {book.pendingSync && (
+            <IonIcon slot="end" icon={cloudOfflineOutline} color="warning" aria-label="Not sent to the server yet" />
+        )}
         {book.genre && <IonNote slot="end" className="book-list-item__genre">{book.genre}</IonNote>}
     </IonItem>
 );

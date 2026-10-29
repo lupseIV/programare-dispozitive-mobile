@@ -1,10 +1,11 @@
+import { ApiError } from '../services/http';
+
 export function errorMessage(err: unknown): string {
     if (!err) return '';
-    const e = err as { status?: unknown; data?: { error?: string; fields?: Record<string, string> } };
-    if (e.data?.error) {
-        const fields = e.data.fields ? ': ' + Object.values(e.data.fields).join(', ') : '';
-        return e.data.error + fields;
+    if (err instanceof ApiError) {
+        if (err.status === 0) return 'Cannot reach the server';
+        const fields = err.data?.fields ? ': ' + Object.values(err.data.fields).join(', ') : '';
+        return (err.data?.error ?? 'Something went wrong') + fields;
     }
-    if (e.status === 'FETCH_ERROR') return 'Cannot reach the server';
-    return 'Something went wrong';
+    return typeof err === 'string' ? err : 'Something went wrong';
 }

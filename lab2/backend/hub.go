@@ -20,12 +20,19 @@ type Hub struct {
 	clients    map[*client]bool
 	register   chan *client
 	unregister chan *client
-	broadcast  chan []byte
+	broadcast  chan userMessage
+}
+
+// userMessage is delivered only to the sockets of the user who owns the book.
+type userMessage struct {
+	userID int64
+	data   []byte
 }
 
 type client struct {
-	conn *websocket.Conn
-	send chan []byte
+	userID int64
+	conn   *websocket.Conn
+	send   chan []byte
 }
 
 var upgrader = websocket.Upgrader{
@@ -39,7 +46,7 @@ func NewHub() *Hub {
 		clients:    map[*client]bool{},
 		register:   make(chan *client),
 		unregister: make(chan *client),
-		broadcast:  make(chan []byte, 64),
+		broadcast:  make(chan userMessage, 64),
 	}
 }
 
@@ -57,8 +64,11 @@ func (h *Hub) Run() {
 			}
 		case msg := <-h.broadcast:
 			for c := range h.clients {
+				if c.userID != msg.userID {
+					continue
+				}
 				select {
-				case c.send <- msg:
+				case c.send <- msg.data:
 				default: // slow client: drop it
 					delete(h.clients, c)
 					close(c.send)
@@ -68,18 +78,28 @@ func (h *Hub) Run() {
 	}
 }
 
-func (h *Hub) Notify(eventType string, b Book) {
+func (h *Hub) Notify(userID int64, eventType string, b Book) {
 	data, _ := json.Marshal(Event{Type: eventType, Payload: b})
-	h.broadcast <- data
+	h.broadcast <- userMessage{userID: userID, data: data}
 }
 
-func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
+// serveWS authenticates with ?token= (browsers cannot set headers on WebSockets).
+func (a *API) serveWS(w http.ResponseWriter, r *http.Request) {
+	u, err := a.store.UserByToken(r.URL.Query().Get("token"))
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "invalid token")
+		return
+	}
+	a.hub.serve(w, r, u.ID)
+}
+
+func (h *Hub) serve(w http.ResponseWriter, r *http.Request, userID int64) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("ws upgrade: %v", err)
 		return
 	}
-	c := &client{conn: conn, send: make(chan []byte, 16)}
+	c := &client{userID: userID, conn: conn, send: make(chan []byte, 16)}
 	h.register <- c
 	go c.writeLoop()
 	go c.readLoop(h)

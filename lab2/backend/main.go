@@ -10,6 +10,7 @@ import (
 func main() {
 	addr := flag.String("addr", ":3000", "HTTP listen address")
 	dbPath := flag.String("db", "books.db", "SQLite database file")
+	usersFile := flag.String("users", "users.json", "JSON file with the users to create on start")
 	simulate := flag.Bool("simulate", false, "periodically change data on the server to demo websocket notifications")
 	flag.Parse()
 
@@ -28,18 +29,26 @@ func main() {
 		}
 	}(store)
 
+	if err := store.SeedUsers(*usersFile); err != nil {
+		log.Fatalf("seed users from %s: %v", *usersFile, err)
+	}
+
 	hub := NewHub()
 	go hub.Run()
 
 	api := &API{store: store, hub: hub}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/books", api.listBooks)
-	mux.HandleFunc("GET /api/books/{id}", api.getBook)
-	mux.HandleFunc("POST /api/books", api.createBook)
-	mux.HandleFunc("PUT /api/books/{id}", api.updateBook)
-	mux.HandleFunc("DELETE /api/books/{id}", api.deleteBook)
-	mux.HandleFunc("GET /ws", hub.ServeWS)
+	mux.HandleFunc("POST /api/auth/login", api.login)
+	mux.HandleFunc("POST /api/auth/logout", api.requireAuth(api.logout))
+	mux.HandleFunc("GET /api/auth/me", api.requireAuth(api.me))
+	mux.HandleFunc("GET /api/genres", api.requireAuth(api.listGenres))
+	mux.HandleFunc("GET /api/books", api.requireAuth(api.listBooks))
+	mux.HandleFunc("GET /api/books/{id}", api.requireAuth(api.getBook))
+	mux.HandleFunc("POST /api/books", api.requireAuth(api.createBook))
+	mux.HandleFunc("PUT /api/books/{id}", api.requireAuth(api.updateBook))
+	mux.HandleFunc("DELETE /api/books/{id}", api.requireAuth(api.deleteBook))
+	mux.HandleFunc("GET /ws", api.serveWS)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})

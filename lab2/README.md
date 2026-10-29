@@ -1,6 +1,27 @@
-# My Books – Lab 1 (Master–Detail App)
+# My Books – Lab 2 (built on the Lab 1 master–detail app)
 
 A mobile app (Ionic + React + Redux Toolkit) for keeping track of the books you own and read, backed by a Go REST server with SQLite and live updates over WebSockets.
+
+## Lab 2 additions
+
+| Requirement | Where |
+|---|---|
+| Network status (online / offline / server unreachable) | `ConnectionBadge` (device `online`/`offline` events + websocket state) |
+| Authentication, token in `localStorage`, no login page when already authenticated, logout | `backend/auth.go`, `features/auth`, `routes/AppRoutes.tsx`, logout button on the list |
+| Books linked to the user; REST + websocket only expose the owner's books | `books.user_id`, every query filtered by user; hub delivers events per user (`/ws?token=`) |
+| Online/offline behaviour | `features/books/booksSlice.ts`: REST first, failed/offline writes go to a persisted queue, list items show a cloud-offline icon, banner "N changes not sent" |
+| Automatic sync when back online | `components/common/LiveSync.tsx` flushes the queue on the `online` event and whenever the websocket (re)connects |
+| Pagination | `?page=&size=` + infinite scroll (20 per page) |
+| Search & filter | title/author search, read/unread segment, genre select (all server-side; filtered locally when offline) |
+
+Conflict policy when syncing: a queued edit that hits a version conflict (409) overwrites the server copy (last write wins); changes rejected with a 4xx (e.g. validation) are dropped and reported.
+
+### Run
+```
+cd backend  && go run . [-simulate]     # http://localhost:3000
+cd frontend && npm install && npm run dev
+```
+Log in with a user from `backend/users.json` (alice/alice123, bob/bob123, carol/carol123); the backend creates missing users, with sample books, on start. There is no sign-up. To test offline mode, use DevTools -> Network -> Offline, or stop the server.
 
 ## Features
 

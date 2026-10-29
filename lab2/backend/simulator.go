@@ -16,9 +16,14 @@ func runSimulator(store *Store, hub *Hub) {
 	genres := []string{"Sci-Fi", "Fantasy", "Programming", "Classic"}
 	n := 0
 	for range time.Tick(10 * time.Second) {
+		ids, err := store.UserIDs()
+		if err != nil || len(ids) == 0 {
+			continue
+		}
+		uid := ids[rand.Intn(len(ids))]
 		n++
 		if n%2 == 1 {
-			b, err := store.Create(&Book{
+			b, err := store.Create(uid, &Book{
 				Title:  fmt.Sprintf("%s #%d", titles[rand.Intn(len(titles))], n),
 				Author: authors[rand.Intn(len(authors))],
 				Genre:  genres[rand.Intn(len(genres))],
@@ -27,21 +32,21 @@ func runSimulator(store *Store, hub *Hub) {
 			})
 			if err == nil {
 				log.Printf("simulator: created book %d", b.ID)
-				hub.Notify("created", b)
+				hub.Notify(uid, "created", b)
 			}
 			continue
 		}
 		// toggle "read" on a random existing book
-		books, _, err := store.List(ListParams{Limit: 200})
+		books, _, err := store.List(ListParams{UserID: uid, Limit: 200})
 		if err != nil || len(books) == 0 {
 			continue
 		}
 		b := books[rand.Intn(len(books))]
 		b.Read = !b.Read
 		b.Version = 0 // unconditional update
-		if u, err := store.Update(b.ID, &b); err == nil {
+		if u, err := store.Update(uid, b.ID, &b); err == nil {
 			log.Printf("simulator: updated book %d (read=%v)", u.ID, u.Read)
-			hub.Notify("updated", u)
+			hub.Notify(uid, "updated", u)
 		}
 	}
 }

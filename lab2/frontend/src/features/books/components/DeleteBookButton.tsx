@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { IonButton, useIonAlert } from '@ionic/react';
 import { Book } from '../book.types';
-import { useDeleteBookMutation } from '../services/booksApi';
+import { removeBook } from '../booksSlice';
+import { useAppDispatch } from '../../../store/hooks';
+import { notify } from '../../../store/slices/liveSlice';
+import { errorMessage } from '../../../utils/errorMessage';
 
 interface Props {
     book: Book;
@@ -9,8 +12,21 @@ interface Props {
 }
 
 const DeleteBookButton: React.FC<Props> = ({ book, onDeleted }) => {
+    const dispatch = useAppDispatch();
     const [presentAlert] = useIonAlert();
-    const [deleteBook, { isLoading }] = useDeleteBookMutation();
+    const [busy, setBusy] = useState(false);
+
+    const remove = async () => {
+        setBusy(true);
+        try {
+            const savedLocally = await dispatch(removeBook(book)).unwrap();
+            if (savedLocally) dispatch(notify('Deleted on this device - will be sent when the server is reachable'));
+            onDeleted();
+        } catch (e) {
+            setBusy(false);
+            presentAlert({ header: 'Could not delete', message: errorMessage(e), buttons: ['OK'] });
+        }
+    };
 
     const confirm = () =>
         presentAlert({
@@ -18,19 +34,12 @@ const DeleteBookButton: React.FC<Props> = ({ book, onDeleted }) => {
             message: `"${book.title}" will be removed.`,
             buttons: [
                 { text: 'Cancel', role: 'cancel' },
-                {
-                    text: 'Delete',
-                    role: 'destructive',
-                    handler: async () => {
-                        await deleteBook(book.id!).unwrap();
-                        onDeleted();
-                    },
-                },
+                { text: 'Delete', role: 'destructive', handler: remove },
             ],
         });
 
     return (
-        <IonButton expand="block" color="danger" fill="outline" onClick={confirm} disabled={isLoading}>
+        <IonButton expand="block" color="danger" fill="outline" onClick={confirm} disabled={busy}>
             Delete
         </IonButton>
     );

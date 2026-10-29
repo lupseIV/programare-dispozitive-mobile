@@ -26,6 +26,7 @@ func (a *API) listBooks(w http.ResponseWriter, r *http.Request) {
 		size = 50
 	}
 	p := ListParams{
+		UserID: userFrom(r).ID,
 		Query:  strings.TrimSpace(qs.Get("q")),
 		Genre:  qs.Get("genre"),
 		Limit:  size,
@@ -53,7 +54,7 @@ func (a *API) getBook(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	b, err := a.store.Get(id)
+	b, err := a.store.Get(userFrom(r).ID, id)
 	if errors.Is(err, ErrNotFound) {
 		writeError(w, http.StatusNotFound, "book not found")
 		return
@@ -69,12 +70,12 @@ func (a *API) createBook(w http.ResponseWriter, r *http.Request) {
 	if !decodeAndValidate(w, r, &in) {
 		return
 	}
-	b, err := a.store.Create(&in)
+	b, err := a.store.Create(userFrom(r).ID, &in)
 	if err != nil {
 		serverError(w, err)
 		return
 	}
-	a.hub.Notify("created", b)
+	a.hub.Notify(userFrom(r).ID, "created", b)
 	writeJSON(w, http.StatusCreated, b)
 }
 
@@ -87,7 +88,7 @@ func (a *API) updateBook(w http.ResponseWriter, r *http.Request) {
 	if !decodeAndValidate(w, r, &in) {
 		return
 	}
-	b, err := a.store.Update(id, &in)
+	b, err := a.store.Update(userFrom(r).ID, id, &in)
 	switch {
 	case errors.Is(err, ErrNotFound):
 		writeError(w, http.StatusNotFound, "book not found")
@@ -100,7 +101,7 @@ func (a *API) updateBook(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	a.hub.Notify("updated", b)
+	a.hub.Notify(userFrom(r).ID, "updated", b)
 	writeJSON(w, http.StatusOK, b)
 }
 
@@ -109,7 +110,7 @@ func (a *API) deleteBook(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	b, err := a.store.Delete(id)
+	b, err := a.store.Delete(userFrom(r).ID, id)
 	if errors.Is(err, ErrNotFound) {
 		writeError(w, http.StatusNotFound, "book not found")
 		return
@@ -117,14 +118,18 @@ func (a *API) deleteBook(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	a.hub.Notify("deleted", b)
+	a.hub.Notify(userFrom(r).ID, "deleted", b)
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // ---------- helpers ----------
 
+func decodeJSON(w http.ResponseWriter, r *http.Request, v any) error {
+	return json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(v)
+}
+
 func decodeAndValidate(w http.ResponseWriter, r *http.Request, b *Book) bool {
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(b); err != nil {
+	if err := decodeJSON(w, r, b); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return false
 	}
@@ -223,4 +228,13 @@ func logging(next http.Handler) http.Handler {
 		next.ServeHTTP(rec, r)
 		log.Printf("%s %s -> %d (%s)", r.Method, r.URL.RequestURI(), rec.status, time.Since(start).Round(time.Microsecond))
 	})
+}
+
+func (a *API) listGenres(w http.ResponseWriter, r *http.Request) {
+	genres, err := a.store.Genres(userFrom(r).ID)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, genres)
 }

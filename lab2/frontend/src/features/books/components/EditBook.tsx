@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { IonButton, IonSpinner, IonText } from '@ionic/react';
-import { skipToken } from '@reduxjs/toolkit/query';
 import { Book } from '../book.types';
-import { useGetBookQuery, useGetBooksQuery, useUpdateBookMutation } from '../services/booksApi';
+import { saveBook, selectBookById } from '../booksSlice';
+import { useAppDispatch, useAppSelector } from '../../../store/hooks';
+import { notify } from '../../../store/slices/liveSlice';
+import { http } from '../../../services/http';
 import { errorMessage } from '../../../utils/errorMessage';
 import BookForm from './BookForm';
 import DeleteBookButton from './DeleteBookButton';
@@ -14,32 +16,33 @@ interface Props {
 }
 
 const EditBook: React.FC<Props> = ({ bookId, onDone }) => {
+    const dispatch = useAppDispatch();
     const [book, setBook] = useState<Book>();
+    const [loadError, setLoadError] = useState<unknown>();
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState<unknown>();
 
-    const { fromList, listLoaded } = useGetBooksQuery(undefined, {
-        selectFromResult: ({ data, isSuccess }) => ({
-            fromList: data?.find(b => b.id === bookId),
-            listLoaded: isSuccess,
-        }),
-    });
-    const { data: fetched, error: loadError } = useGetBookQuery(fromList || book ? skipToken : bookId);
-
-    const [updateBook, { isLoading, error: saveError }] = useUpdateBookMutation();
-
-    const serverBook = fromList ?? fetched;
+    // the list may not contain this book (other page, deep link): then ask the server
+    const known = useAppSelector(selectBookById(bookId));
     useEffect(() => {
-        if (!book && serverBook) setBook(serverBook);
-    }, [book, serverBook]);
-
-    const deletedOnServer = !!book && listLoaded && !fromList;
+        if (!book && known) setBook(known);
+    }, [book, known]);
+    useEffect(() => {
+        if (known || book || bookId < 0) return;
+        http<Book>(`/books/${bookId}`).then(setBook, setLoadError);
+    }, [bookId, known, book]);
 
     const save = async () => {
         if (!book) return;
+        setSaving(true);
+        setSaveError(undefined);
         try {
-            await updateBook(book).unwrap();
+            const savedLocally = await dispatch(saveBook(book)).unwrap();
+            if (savedLocally) dispatch(notify('Saved on this device - will be sent when the server is reachable'));
             onDone();
-        } catch {
-            // error is shown through `saveError`
+        } catch (e) {
+            setSaveError(e);
+            setSaving(false);
         }
     };
 
@@ -48,22 +51,16 @@ const EditBook: React.FC<Props> = ({ bookId, onDone }) => {
 
     return (
         <>
-            {deletedOnServer && (
-            <IonText color="warning">
-            <p className="edit-book__warning">This book was deleted on the server.</p>
-    </IonText>
-)}
+            <BookForm book={book} onChange={setBook} error={errorMessage(saveError)} />
 
-    <BookForm book={book} onChange={setBook} error={errorMessage(saveError)} />
-
-    <div className="edit-book__actions">
-    <IonButton expand="block" onClick={save} disabled={isLoading || deletedOnServer}>
-    Save
-    </IonButton>
-    <DeleteBookButton book={book} onDeleted={onDone} />
-    </div>
-    </>
-);
+            <div className="edit-book__actions">
+                <IonButton expand="block" onClick={save} disabled={saving}>
+                    Save
+                </IonButton>
+                <DeleteBookButton book={book} onDeleted={onDone} />
+            </div>
+        </>
+    );
 };
 
 export default EditBook;

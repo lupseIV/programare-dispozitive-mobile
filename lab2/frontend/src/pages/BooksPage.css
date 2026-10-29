@@ -8,3 +8,16 @@
     text-align: center;
     color: var(--ion-color-medium);
 }
+
+.books-page__cache-note,
+.books-page__count {
+    padding: 8px 16px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--ion-color-medium);
+}
+
+
+.books-page__more {
+    padding: 24px 0 96px; /* room for the loader, and clearance for the + button */
+}

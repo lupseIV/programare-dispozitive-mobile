@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { IonButton } from '@ionic/react';
 import { Book, emptyBook } from '../book.types';
-import { useAddBookMutation } from '../services/booksApi';
+import { saveBook } from '../booksSlice';
+import { useAppDispatch } from '../../../store/hooks';
+import { notify } from '../../../store/slices/liveSlice';
 import { errorMessage } from '../../../utils/errorMessage';
 import BookForm from './BookForm';
 
@@ -10,22 +12,28 @@ interface Props {
 }
 
 const CreateBook: React.FC<Props> = ({ onDone }) => {
+    const dispatch = useAppDispatch();
     const [book, setBook] = useState<Book>(emptyBook());
-    const [addBook, { isLoading, error }] = useAddBookMutation();
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<unknown>();
 
     const save = async () => {
+        setSaving(true);
+        setError(undefined);
         try {
-            await addBook(book).unwrap();
+            const savedLocally = await dispatch(saveBook(book)).unwrap();
+            if (savedLocally) dispatch(notify('Saved on this device - will be sent when the server is reachable'));
             onDone();
-        } catch {
-            // error is shown through `error`
+        } catch (e) {
+            setError(e);
+            setSaving(false);
         }
     };
 
     return (
         <>
             <BookForm book={book} onChange={setBook} error={errorMessage(error)} />
-            <IonButton expand="block" onClick={save} disabled={isLoading}>
+            <IonButton expand="block" onClick={save} disabled={saving}>
                 Create
             </IonButton>
         </>

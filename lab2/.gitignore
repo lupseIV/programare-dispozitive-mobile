@@ -1,0 +1,19 @@
+# editor / tooling
+.idea/
+.vscode/
+.vibe-wise/
+
+# dependencies and build output
+node_modules/
+dist/
+build/
+
+# local databases and binaries
+*.db
+*.db-*
+*.exe
+
+# logs and OS files
+*.log
+.DS_Store
+Thumbs.db
